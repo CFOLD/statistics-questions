@@ -15,6 +15,9 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from datetime import datetime
 
+# Set environment variable to force unbuffered output
+os.environ['PYTHONUNBUFFERED'] = '1'
+
 # Configuration - use working directory (repo root)
 QUESTIONS_DIR = Path.cwd() / 'generated_questions'
 SMTP_HOST = os.getenv('SMTP_HOST')
@@ -26,12 +29,11 @@ EMAIL_RECIPIENTS = os.getenv('EMAIL_RECIPIENTS', '').split(',')
 
 def get_random_question() -> dict:
     """Get a random question from the generated_questions directory."""
-    import subprocess
-    result = subprocess.run(['ls', '-la', 'generated_questions/'], capture_output=True, text=True)
-    print(f"ls output:\n{result.stdout}\n{result.stderr}")
+    sys.stderr.write(f"DEBUG: QUESTIONS_DIR = {QUESTIONS_DIR}\n")
+    sys.stderr.write(f"DEBUG: exists = {QUESTIONS_DIR.exists()}\n")
+    sys.stderr.write(f"DEBUG: is_dir = {QUESTIONS_DIR.is_dir()}\n")
     md_files = list(QUESTIONS_DIR.glob('*.md'))
-    print(f"QUESTIONS_DIR: {QUESTIONS_DIR}")
-    print(f"md_files: {md_files}")
+    sys.stderr.write(f"DEBUG: found {len(md_files)} files\n")
     if not md_files:
         raise FileNotFoundError("No question files found")
 
