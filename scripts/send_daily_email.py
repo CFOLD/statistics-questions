@@ -4,6 +4,12 @@ Daily Statistics Question Email Sender
 
 Fetches a random question from generated_questions/, parses Markdown,
 converts to HTML with HTML math entities (no JS), and sends via SMTP.
+
+Email-optimized design:
+- No JavaScript (works in all email clients)
+- Inline CSS for maximum compatibility
+- Tables render correctly in Gmail/Outlook/Apple Mail
+- Large spacing between question and explanation
 """
 
 import os
@@ -146,7 +152,7 @@ def markdown_to_html(md_content: str) -> str:
 
 
 def create_email_html(question: dict) -> str:
-    """Create HTML email with large spacing between question and explanation."""
+    """Create HTML email optimized for email clients."""
     date_str = datetime.now().strftime('%Y-%m-%d')
     sections = parse_markdown_question(question['content'])
 
@@ -155,220 +161,149 @@ def create_email_html(question: dict) -> str:
     explanation_html = markdown_to_html(sections['explanation'])
     purpose_html = markdown_to_html(sections['purpose'])
 
-    return f"""<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    # Email-safe inline styles
+    # Note: Email clients have limited CSS support, so we use both <style> and inline
 
-  <style>
-    body {{
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      line-height: 1.8;
-      color: #333;
-      max-width: 700px;
-      margin: 0 auto;
-      padding: 20px;
-      background-color: #f5f5f5;
-    }}
-    .email-container {{
-      background: white;
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-    }}
-    .header {{
-      background: linear-gradient(135deg, #4A90A4 0%, #357A9A 100%);
-      color: white;
-      padding: 28px 24px;
-    }}
-    .header h1 {{
+    return f"""<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="x-apple-disable-message-reformatting" />
+  <title>통계분석 일일 문제</title>
+  <style type="text/css">
+    /* Reset styles */
+    body, table, td, p, a, li, blockquote {{
+      -ms-text-size-adjust: 100%;
+      -webkit-text-size-adjust: 100%;
       margin: 0;
-      font-size: 28px;
-      font-weight: 600;
-    }}
-    .header p {{
-      margin: 8px 0 0 0;
-      font-size: 14px;
-      opacity: 0.9;
-    }}
-    .content {{
-      padding: 32px 28px;
-    }}
-    .question-section {{
-      background: #f8fafb;
-      border: 1px solid #e1e8ed;
-      border-radius: 10px;
-      padding: 24px 22px;
-      margin-bottom: 80px;
-    }}
-    .question-section h2 {{
-      color: #2c5282;
-      font-size: 18px;
-      font-weight: 600;
-      margin: 0 0 16px 0;
-      padding-bottom: 12px;
-      border-bottom: 2px solid #bed6e6;
-    }}
-    .question-section p {{
-      margin: 0 0 12px 0;
-      font-size: 16px;
-      line-height: 1.8;
-    }}
-    .question-section p:last-child {{
-      margin-bottom: 0;
-    }}
-    .spacer {{
-      height: 1000px;
-      background: linear-gradient(to bottom, #f5f5f5, transparent);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #ccc;
-      font-size: 14px;
-    }}
-    .explanation-section {{
-      background: #f0f7ff;
-      border: 1px solid #d1e8ff;
-      border-radius: 10px;
-      padding: 24px 22px;
-      margin-bottom: 20px;
-    }}
-    .explanation-section h2 {{
-      color: #2b6cb0;
-      font-size: 18px;
-      font-weight: 600;
-      margin: 0 0 16px 0;
-      padding-bottom: 12px;
-      border-bottom: 2px solid #93c5fd;
-    }}
-    .explanation-section p {{
-      margin: 0 0 12px 0;
-      font-size: 15px;
-      line-height: 1.8;
-    }}
-    .explanation-section p:last-child {{
-      margin-bottom: 0;
-    }}
-    .purpose-section {{
-      background: #f9fbf5;
-      border: 1px solid #e8f0d8;
-      border-radius: 10px;
-      padding: 24px 22px;
-    }}
-    .purpose-section h2 {{
-      color: #276749;
-      font-size: 18px;
-      font-weight: 600;
-      margin: 0 0 16px 0;
-      padding-bottom: 12px;
-      border-bottom: 2px solid #9ae6b4;
-    }}
-    .purpose-section p {{
-      margin: 0;
-      font-size: 14px;
-      line-height: 1.8;
-      color: #4a5568;
-    }}
-    code {{
-      font-family: 'SF Mono', 'Monaco', 'Consolas', 'Courier New', monospace;
-      background: #edf2f7;
-      color: #2d3748;
-      padding: 3px 8px;
-      border-radius: 5px;
-      font-size: 0.9em;
-    }}
-    .math {{
-      background: #e8f5e9;
-      border: 1px solid #c8e6c9;
-    }}
-    .math-display {{
-      text-align: center;
-      padding: 16px;
-      margin: 12px 0;
-      background: #f1f8f4;
-      border-radius: 8px;
-    }}
-    .latex {{
-      font-size: 0.8em;
-      color: #999;
-      font-style: italic;
-    }}
-    pre {{
-      background: #1a202c;
-      color: #f7fafc;
-      padding: 16px;
-      border-radius: 8px;
-      overflow-x: auto;
-      margin: 12px 0;
-    }}
-    pre code {{
-      background: transparent;
-      color: inherit;
       padding: 0;
     }}
+    table, td {{
+      mso-table-lspace: 0pt;
+      mso-table-rspace: 0pt;
+    }}
     table {{
-      border-collapse: collapse;
-      width: 100%;
-      margin: 16px 0;
-      font-size: 14px;
+      border-collapse: collapse !important;
     }}
-    th {{
-      background: #e2e8f0;
-      padding: 10px 12px;
-      text-align: left;
-      font-weight: 600;
-      border: 1px solid #cbd5e0;
+    img {{
+      -ms-interpolation-mode: bicubic;
+      border: 0;
+      height: auto;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
     }}
-    td {{
-      padding: 10px 12px;
-      border: 1px solid #e2e8f0;
+    p {{
+      margin: 0 0 16px 0;
     }}
-    ul, ol {{
-      margin: 0 0 12px 0;
-      padding-left: 24px;
+    /* iOS blue links */
+    a {{
+      color: #2563eb;
     }}
-    ul li, ol li {{
-      margin: 6px 0;
+    /* Remove iOS greying */
+    u+[b] a {{
+      color: inherit;
+      text-decoration: none;
     }}
-    hr {{
-      border: none;
-      border-top: 2px solid #e2e8f0;
-      margin: 24px 0;
+    /* Media queries */
+    @media screen and (max-width: 600px) {{
+      .email-container {{
+        width: 100% !important;
+      }}
+      .content-padding {{
+        padding-left: 20px !important;
+        padding-right: 20px !important;
+      }}
     }}
   </style>
 </head>
-<body>
-  <div class="email-container">
-    <div class="header">
-      <h1>📊 통계분석 일일 문제</h1>
-      <p>{date_str}</p>
-    </div>
+<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: Georgia, 'Times New Roman', Times, serif;">
 
-    <div class="content">
-      <div class="question-section">
-        <h2>문항</h2>
-        {question_html}
-      </div>
+  <!-- Center wrapper -->
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f5f5f5;">
+    <tr>
+      <td align="center" style="padding: 20px 0;">
 
-      <div class="spacer">
-        <div>
-          <p>📝 아래로 스크롤하여 해설 확인</p>
-          <p style="font-size: 12px;">(먼저 문제를 풀어보세요!)</p>
-        </div>
-      </div>
+        <!-- Main container -->
+        <table class="email-container" role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" style="background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); max-width: 600px; width: 100%;">
 
-      <div class="explanation-section">
-        <h2>해설</h2>
-        <div class="explanation-content">{explanation_html}</div>
-      </div>
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #4A90A4 0%, #357A9A 100%); padding: 32px 28px; text-align: left;">
+              <h1 style="margin: 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 26px; font-weight: 600; color: #ffffff; line-height: 1.3;">📊 통계분석 일일 문제</h1>
+              <p style="margin: 10px 0 0 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 14px; color: rgba(255,255,255,0.9);">{date_str}</p>
+            </td>
+          </tr>
 
-      <div class="purpose-section">
-        <h2>출제 의도</h2>
-        <div class="purpose-content">{purpose_html}</div>
-      </div>
-    </div>
-  </div>
+          <!-- Content -->
+          <tr>
+            <td class="content-padding" style="padding: 36px 32px; background-color: #ffffff;">
+
+              <!-- Question Section -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f8fafb; border: 1px solid #e1e8ed; border-radius: 8px; margin-bottom: 40px;">
+                <tr>
+                  <td style="padding: 28px 24px;">
+                    <h2 style="margin: 0 0 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 600; color: #2c5282; padding-bottom: 14px; border-bottom: 2px solid #bed6e6;">문항</h2>
+                    <div style="font-size: 16px; line-height: 1.8; color: #334155;">
+                      {question_html}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Large spacer (1000px) -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" height="1000" style="background: linear-gradient(to bottom, #f5f5f5, rgba(245,245,245,0.3)); margin: 40px 0;">
+                <tr>
+                  <td align="center" valign="middle" style="color: #94a3b8; font-size: 15px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+                    <p style="margin: 0 0 10px 0; font-size: 16px; font-weight: 600;">📝 아래로 스크롤하여 해설 확인</p>
+                    <p style="margin: 0; font-size: 13px; color: #64748b;">(먼저 문제를 풀어보세요!)</p>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Explanation Section -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f0f7ff; border: 1px solid #d1e8ff; border-radius: 8px; margin-bottom: 16px;">
+                <tr>
+                  <td style="padding: 28px 24px;">
+                    <h2 style="margin: 0 0 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 600; color: #2b6cb0; padding-bottom: 14px; border-bottom: 2px solid #93c5fd;">해설</h2>
+                    <div style="font-size: 15px; line-height: 1.8; color: #334155;">
+                      {explanation_html}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Purpose Section -->
+              <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f9fbf5; border: 1px solid #e8f0d8; border-radius: 8px;">
+                <tr>
+                  <td style="padding: 28px 24px;">
+                    <h2 style="margin: 0 0 20px 0; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: 600; color: #276749; padding-bottom: 14px; border-bottom: 2px solid #9ae6b4;">출제 의도</h2>
+                    <div style="font-size: 14px; line-height: 1.8; color: #4a5568;">
+                      {purpose_html}
+                    </div>
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+        </table>
+
+        <!-- Footer -->
+        <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; width: 100%; margin-top: 20px;">
+          <tr>
+            <td align="center" style="padding: 20px; color: #94a3b8; font-size: 12px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
+              <p style="margin: 0;">통계분석 일일 문제 | <a href="https://github.com/CFOLD/statistics-questions" style="color: #64748b; text-decoration: underline;">더 많은 문제 보기</a></p>
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
 </body>
 </html>"""
 
