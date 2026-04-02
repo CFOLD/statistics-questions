@@ -21,7 +21,7 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install markdown
+        run: pip install markdown-it-py beautifulsoup4
 
       - name: Send email
         env:
