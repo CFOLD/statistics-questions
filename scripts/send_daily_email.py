@@ -85,14 +85,14 @@ def create_email_html(question: dict) -> str:
       border: 1px solid #e1e8ed;
       border-radius: 10px;
       padding: 24px 22px;
-      margin-bottom: 36px;
+      margin-bottom: 60px;
     }}
     .explanation-section {{
       background: #f0f7ff;
       border: 1px solid #d1e8ff;
       border-radius: 10px;
       padding: 24px 22px;
-      margin-bottom: 36px;
+      margin-bottom: 60px;
     }}
     .purpose-section {{
       background: #f9fbf5;
