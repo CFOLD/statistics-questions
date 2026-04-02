@@ -8,7 +8,7 @@ converts to HTML with HTML math entities (no JS), and sends via SMTP.
 Email-optimized design:
 - No JavaScript (works in all email clients)
 - Inline CSS for maximum compatibility
-- Tables render correctly in Gmail/Outlook/Apple Mail
+- Custom table parser for reliable rendering
 - Large spacing between question and explanation
 """
 
@@ -20,7 +20,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 from datetime import datetime
-import markdown
+from html import escape
 
 # Configuration - use working directory (repo root)
 QUESTIONS_DIR = Path.cwd() / 'generated_questions'
@@ -70,86 +70,262 @@ def parse_markdown_question(content: str) -> dict:
 
 def latex_to_html(latex: str) -> str:
     """Convert LaTeX math to HTML entities."""
-    # Greek letters
+    result = latex
+
+    # Greek letters and symbols (single backslash)
     replacements = {
-        'alpha': '&alpha;', 'beta': '&beta;', 'gamma': '&gamma;',
-        'delta': '&delta;', 'epsilon': '&epsilon;', 'zeta': '&zeta;',
-        'eta': '&eta;', 'theta': '&theta;', 'lambda': '&lambda;',
-        'mu': '&mu;', 'xi': '&xi;', 'pi': '&pi;', 'rho': '&rho;',
-        'sigma': '&sigma;', 'tau': '&tau;', 'phi': '&phi;',
-        'chi': '&chi;', 'psi': '&psi;', 'omega': '&omega;',
-        'Delta': '&Delta;', 'Sigma': '&Sigma;', 'Pi': '&Pi;',
-        'Phi': '&Phi;', 'Omega': '&Omega;',
-        # Symbols
-        'times': '&times;', 'div': '&divide;', 'pm': '&plusmn;',
-        'approx': '&approx;', 'leq': '&le;', 'geq': '&ge;',
-        'neq': '&ne;', 'infty': '&infin;', 'sqrt': '&radic;',
-        'sum': '&sum;', 'prod': '&prod;', 'int': '&int;',
-        'partial': '&part;', 'prime': '&prime;',
-        'rightarrow': '&rarr;', 'leftarrow': '&larr;',
-        'Leftrightarrow': '&harr;', 'equiv': '&equiv;',
-        'in': '&isin;', 'subset': '&sub;', 'supset': '&sup;',
-        'cup': '&cup;', 'cap': '&cap;', 'emptyset': '&empty;',
+        # Greek lowercase
+        '\\alpha': '&alpha;', '\\beta': '&beta;', '\\gamma': '&gamma;',
+        '\\delta': '&delta;', '\\epsilon': '&epsilon;', '\\zeta': '&zeta;',
+        '\\eta': '&eta;', '\\theta': '&theta;', '\\lambda': '&lambda;',
+        '\\mu': '&mu;', '\\xi': '&xi;', '\\pi': '&pi;', '\\rho': '&rho;',
+        '\\sigma': '&sigma;', '\\tau': '&tau;', '\\phi': '&phi;',
+        '\\chi': '&chi;', '\\psi': '&psi;', '\\omega': '&omega;',
+        # Greek uppercase
+        '\\Delta': '&Delta;', '\\Gamma': '&Gamma;', '\\Lambda': '&Lambda;',
+        '\\Sigma': '&Sigma;', '\\Pi': '&Pi;', '\\Phi': '&Phi;', '\\Omega': '&Omega;',
+        # Math symbols
+        '\\times': '&times;', '\\div': '&divide;', '\\pm': '&plusmn;',
+        '\\approx': '&approx;', '\\leq': '&le;', '\\le': '&le;',
+        '\\geq': '&ge;', '\\ge': '&ge;',
+        '\\neq': '&ne;', '\\ne': '&ne;',
+        '\\infty': '&infin;',
+        '\\sum': '&sum;', '\\prod': '&prod;', '\\int': '&int;',
+        '\\partial': '&part;', '\\prime': '&prime;',
+        '\\rightarrow': '&rarr;', '\\to': '&rarr;',
+        '\\leftarrow': '&larr;',
+        '\\Rightarrow': '&rarr;',
+        '\\Leftrightarrow': '&harr;',
+        '\\equiv': '&equiv;',
+        '\\in': '&isin;', '\\subset': '&sub;', '\\supset': '&sup;',
+        '\\cup': '&cup;', '\\cap': '&cap;', '\\emptyset': '&empty;',
+        '\\sqrt': '&radic;',
     }
 
-    result = latex
-    for key, value in replacements.items():
+    # Apply all replacements (longer patterns first to avoid partial matches)
+    sorted_items = sorted(replacements.items(), key=lambda x: -len(x[0]))
+    for key, value in sorted_items:
         result = result.replace(key, value)
 
-    # Superscripts: ^{...} or ^...
-    result = re.sub(r'\^\{([^}]*)\}', r'<sup>\1</sup>', result)
-    result = re.sub(r'\^([^ }\{])', r'<sup>\1</sup>', result)
+    # Handle \frac{a}{b} - process numerator/denominator first, then wrap
+    def process_frac_inner(inner: str) -> str:
+        """Process ^ and _ inside frac numerator/denominator."""
+        # Handle ^{...} and ^...
+        inner = re.sub(r'\^\{([^}]*)\}', r'<sup>\1</sup>', inner)
+        inner = re.sub(r'\^(&[a-z]+;|[a-zA-Z0-9])', r'<sup>\1</sup>', inner)
+        # Handle _{...} and _...
+        inner = re.sub(r'_{([^}]*)\}', r'<sub>\1</sub>', inner)
+        inner = re.sub(r'_(&[a-z]+;|[a-zA-Z0-9])', r'<sub>\1</sub>', inner)
+        return inner
 
-    # Subscripts: _{...} or _...
+    def replace_frac(match):
+        num = process_frac_inner(match.group(1))
+        den = process_frac_inner(match.group(2))
+        return f'<sup>{num}</sup>/<sub>{den}</sub>'
+    result = re.sub(r'\\frac\{([^}]+)\}\{([^}]+)\}', replace_frac, result)
+
+    # Superscripts: ^{...} or ^... (outside of frac)
+    result = re.sub(r'\^\{([^}]*)\}', r'<sup>\1</sup>', result)
+    result = re.sub(r'\^(&[a-z]+;|[a-zA-Z0-9])', r'<sup>\1</sup>', result)
+
+    # Subscripts: _{...} or _... (outside of frac)
     result = re.sub(r'_{([^}]*)\}', r'<sub>\1</sub>', result)
-    result = re.sub(r'_([^ }\{])', r'<sub>\1</sub>', result)
+    result = re.sub(r'_(&[a-z]+;|[a-zA-Z0-9])', r'<sub>\1</sub>', result)
+
+    # Remove remaining braces
+    result = result.replace('{', '').replace('}', '')
 
     return result
 
 
+def parse_table_row(line: str, expected_cols: int) -> list:
+    """Parse a table row, handling | inside cells (e.g., Pr(>|z|))."""
+    line = line.strip()
+
+    # Remove leading and trailing |
+    if line.startswith('|'):
+        line = line[1:]
+    if line.endswith('|'):
+        line = line[:-1]
+
+    # Split by |
+    parts = [p.strip() for p in line.split('|')]
+
+    # If we have exactly the right number of columns, return as-is
+    if len(parts) == expected_cols:
+        return parts
+
+    # If we have too many parts, | was inside a cell
+    # Rejoin parts from the right until we have the right count
+    while len(parts) > expected_cols:
+        # Remove empty parts at the end
+        if parts and not parts[-1]:
+            parts.pop()
+            continue
+        # Rejoin last two parts with |
+        if len(parts) >= 2:
+            parts[-2] = parts[-2] + ' | ' + parts[-1]
+            parts.pop()
+        else:
+            break
+
+    return parts[:expected_cols]
+
+
+def parse_markdown_table(lines: list) -> str:
+    """Parse a markdown table and return HTML with inline styles."""
+    if len(lines) < 2:
+        return '\n'.join(lines)
+
+    # Parse separator to get column count first
+    sep_line = lines[1].strip()
+    if sep_line.startswith('|'):
+        sep_line = sep_line[1:]
+    if sep_line.endswith('|'):
+        sep_line = sep_line[:-1]
+    col_count = len(sep_line.split('|'))
+
+    # Parse header with correct column count
+    header_cells = parse_table_row(lines[0], col_count)
+
+    # Build HTML table
+    html = ['<table role="presentation" border="0" cellpadding="4" cellspacing="0" style="border-collapse: collapse; width: 100%; border: 1px solid #ccc; margin: 16px 0;">']
+
+    # Header row
+    html.append('  <tr style="background-color: #f0f4f8;">')
+    for cell in header_cells:
+        math_html = convert_math_to_html(cell)
+        html.append(f'    <th style="border: 1px solid #cbd5e0; padding: 10px 12px; text-align: left; font-weight: 600; font-size: 14px; color: #1e293b;">{math_html}</th>')
+    html.append('  </tr>')
+
+    # Data rows (skip separator line)
+    for i, row_line in enumerate(lines[2:], 1):
+        if not row_line.strip():
+            continue
+        cells = parse_table_row(row_line, col_count)
+        html.append('  <tr>')
+        for j, cell in enumerate(cells):
+            math_html = convert_math_to_html(cell)
+            bg = 'white' if i % 2 == 1 else '#fafafa'
+            html.append(f'    <td style="border: 1px solid #cbd5e0; padding: 10px 12px; text-align: left; font-size: 14px; color: #334155; background-color: {bg};">{math_html}</td>')
+        html.append('  </tr>')
+
+    html.append('</table>')
+    return '\n'.join(html)
+
+
 def convert_math_to_html(content: str) -> str:
-    """Convert LaTeX math expressions to HTML, keeping LaTeX for reference."""
-    # Inline math: $...$ → show HTML + LaTeX
-    def replace_inline(match):
-        latex = match.group(1)
-        html = latex_to_html(latex)
-        return f'<code class="math">{html} <span class="latex">(${latex}$)</span></code>'
+    """Convert LaTeX math expressions to HTML with LaTeX reference."""
+    # Store math expressions with their type (display or inline)
+    math_storage = []
 
-    # Display math: $$...$$ → show HTML + LaTeX
-    def replace_display(match):
+    def store_display(match):
         latex = match.group(1)
-        html = latex_to_html(latex)
-        return f'<div class="math-display"><code>{html} <span class="latex">($${latex}$$)</span></code></div>'
+        idx = len(math_storage)
+        math_storage.append(('display', latex))
+        return f'__MATH_{idx}__'
 
-    result = content
-    result = re.sub(r'\$\$([^$]+)\$\$', replace_display, result)
-    result = re.sub(r'\$([^$]+)\$', replace_inline, result)
+    def store_inline(match):
+        latex = match.group(1)
+        idx = len(math_storage)
+        math_storage.append(('inline', latex))
+        return f'__MATH_{idx}__'
+
+    # First, extract display math $$...$$
+    temp = re.sub(r'\$\$(.+?)\$\$', store_display, content, flags=re.DOTALL)
+    # Then extract inline math $...$
+    temp = re.sub(r'\$([^$]+?)\$', store_inline, temp)
+
+    # Convert each stored math expression
+    def convert_inline(idx):
+        _, latex = math_storage[idx]
+        html = latex_to_html(latex)
+        escaped_latex = escape(latex.strip())
+        return f'<span style="font-family: Georgia, &quot;Times New Roman&quot;, serif; font-size: 15px; color: #0f172a; background: #f1f5f9; padding: 2px 6px; border-radius: 3px;">{html}<span style="font-size: 10px; color: #64748b;"> (${escaped_latex})</span></span>'
+
+    def convert_display(idx):
+        _, latex = math_storage[idx]
+        html = latex_to_html(latex)
+        escaped_latex = escape(latex.strip())
+        return f'<div style="text-align: center; margin: 16px 0; padding: 12px; background: #f8fafc; border-radius: 6px;"><span style="font-family: Georgia, &quot;Times New Roman&quot;, serif; font-size: 18px; color: #1e293b;">{html}</span><br><span style="font-size: 11px; color: #64748b;">${{${escaped_latex}$}}</span></div>'
+
+    # Restore math
+    result = temp
+    for idx, (mtype, latex) in enumerate(math_storage):
+        placeholder = f'__MATH_{idx}__'
+        if mtype == 'display':
+            result = result.replace(placeholder, convert_display(idx))
+        else:
+            result = result.replace(placeholder, convert_inline(idx))
 
     return result
 
 
 def markdown_to_html(md_content: str) -> str:
-    """Convert Markdown to HTML (preserves math for conversion)."""
-    # Temporarily hide math expressions
-    hidden_math = []
-    def hide_math(match):
-        hidden_math.append(match.group(0))
-        return f'__MATH_{len(hidden_math)-1}__'
+    """Convert Markdown to HTML with custom table and math handling."""
+    lines = md_content.split('\n')
+    html_parts = []
+    i = 0
 
-    # Hide math first
-    temp_content = re.sub(r'\$[\$\w\W]*?\$', hide_math, md_content)
+    while i < len(lines):
+        line = lines[i]
 
-    # Convert to HTML
-    html = markdown.markdown(temp_content, extensions=['fenced_code', 'tables'])
+        # Check for table (markdown table starts with | and has |---| separator)
+        if line.strip().startswith('|') and i + 1 < len(lines) and '|---' in lines[i + 1]:
+            table_lines = [line]
+            j = i + 1
+            while j < len(lines) and lines[j].strip().startswith('|'):
+                table_lines.append(lines[j])
+                j += 1
+            html_parts.append(parse_markdown_table(table_lines))
+            i = j
+            continue
 
-    # Restore math and convert
-    for i, math in enumerate(hidden_math):
-        html = html.replace(f'__MATH_{i}__', math)
+        # Check for code block
+        if line.strip().startswith('```'):
+            code_lines = []
+            i += 1
+            while i < len(lines) and not lines[i].strip().startswith('```'):
+                code_lines.append(escape(lines[i]))
+                i += 1
+            code_content = '\n'.join(code_lines)
+            html_parts.append(f'<pre style="background-color: #1e293b; color: #e2e8f0; padding: 16px; border-radius: 6px; overflow-x: auto; font-family: &quot;Courier New&quot;, monospace; font-size: 13px; margin: 16px 0; line-height: 1.6;"><code>{code_content}</code></pre>')
+            i += 1
+            continue
 
-    # Convert math to HTML
-    html = convert_math_to_html(html)
+        # Check for horizontal rule
+        if line.strip() in ['---', '***', '___'] or (line.strip().startswith('-') and len(line.strip()) >= 3 and line.strip().replace('-', '') == ''):
+            html_parts.append('<hr style="border: 0; border-top: 2px solid #e2e8f0; margin: 24px 0;" />')
+            i += 1
+            continue
 
-    return html
+        # Check for heading
+        heading_match = re.match(r'^(#{1,6})\s+(.+)$', line)
+        if heading_match:
+            level = len(heading_match.group(1))
+            text = heading_match.group(2)
+            size = ['24px', '22px', '20px', '18px', '16px', '14px'][level - 1]
+            math_html = convert_math_to_html(text)
+            html_parts.append(f'<h{level} style="font-size: {size}; font-weight: 600; color: #1e293b; margin: 16px 0 12px; line-height: 1.4;">{math_html}</h{level}>')
+            i += 1
+            continue
+
+        # Check for bold/italic
+        if line.strip():
+            text = line
+            # Bold
+            text = re.sub(r'\*\*(.+?)\*\*', r'<strong style="font-weight: 600; color: #1e293b;">\1</strong>', text)
+            # Italic
+            text = re.sub(r'\*(.+?)\*', r'<em style="font-style: italic;">\1</em>', text)
+            # Convert math
+            text = convert_math_to_html(text)
+            html_parts.append(f'<p style="margin: 8px 0; line-height: 1.8; color: #334155;">{text}</p>')
+        else:
+            html_parts.append('<br />')
+
+        i += 1
+
+    return '\n'.join(html_parts)
 
 
 def create_email_html(question: dict) -> str:
