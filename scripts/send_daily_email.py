@@ -14,8 +14,8 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from datetime import datetime
 
-# Configuration
-QUESTIONS_DIR = Path('/home/a/Statistics/generated_questions')
+# Configuration (relative to repo root)
+QUESTIONS_DIR = Path('generated_questions')
 SMTP_HOST = os.getenv('SMTP_HOST')
 SMTP_PORT = int(os.getenv('SMTP_PORT', 587))
 SMTP_USERNAME = os.getenv('SMTP_USERNAME')
