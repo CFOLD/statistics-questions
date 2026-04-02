@@ -2,44 +2,29 @@ name: Daily Statistics Question Email
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # 매일 자정 UTC (한국시간 오전 9 시)
-  workflow_dispatch:  # 수동 실행 가능
+    - cron: '0 0 * * *'
+  workflow_dispatch:
 
 jobs:
   send-email:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ github.workspace }}
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Send daily email
-        working-directory: ${{ github.workspace }}
+      - name: Send email
         env:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
           SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           EMAIL_RECIPIENTS: ${{ secrets.EMAIL_RECIPIENTS }}
-        run: |
-          echo "=========================================="
-          echo "Current directory: $(pwd)"
-          echo "=========================================="
-          echo "Repository contents:"
-          ls -la
-          echo "=========================================="
-          echo "Checking generated_questions directory:"
-          if [ -d "generated_questions" ]; then
-            echo "Directory exists"
-            ls -la generated_questions/
-          else
-            echo "ERROR: generated_questions directory does NOT exist!"
-            exit 1
-          fi
-          echo "=========================================="
-          echo "Running Python script..."
-          python scripts/send_daily_email.py
+        run: python scripts/send_daily_email.py
