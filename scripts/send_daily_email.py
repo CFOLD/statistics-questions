@@ -7,14 +7,12 @@ Converts Markdown to HTML with styled sections for email display.
 """
 
 import os
-import re
 import smtplib
 import random
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 from datetime import datetime
-import markdown
 
 # Configuration - use working directory (repo root)
 QUESTIONS_DIR = Path.cwd() / 'generated_questions'
@@ -27,34 +25,21 @@ EMAIL_RECIPIENTS = os.getenv('EMAIL_RECIPIENTS', '').split(',')
 
 def get_random_question() -> dict:
     """Get a random question from the generated_questions directory."""
-    md_files = list(QUESTIONS_DIR.glob('*.md'))
-    if not md_files:
+    html_files = list(QUESTIONS_DIR.glob('*.html'))
+    if not html_files:
         raise FileNotFoundError("No question files found")
 
-    selected_file = random.choice(md_files)
+    selected_file = random.choice(html_files)
     content = selected_file.read_text(encoding='utf-8')
     return {'file': selected_file.name, 'content': content}
-
-
-def markdown_to_html(md_content: str) -> str:
-    """Convert Markdown to HTML with proper styling for email."""
-    # Use markdown library with extensions
-    html = markdown.markdown(
-        md_content,
-        extensions=['fenced_code', 'tables']
-    )
-    return html
 
 
 def create_email_html(question: dict) -> str:
     """Create HTML email body with the question."""
     date_str = datetime.now().strftime('%Y-%m-%d')
 
-    # Convert markdown content to HTML
-    content_html = markdown_to_html(question['content'])
-
-    # Remove any extra outer divs that markdown might add
-    content_html = re.sub(r'^<div>\s*|(?s)<div>(.*?)</div>\s*$', r'\1', content_html)
+    # Use HTML content directly (question files are .html)
+    content_html = question['content']
 
     return f"""<!DOCTYPE html>
 <html>
