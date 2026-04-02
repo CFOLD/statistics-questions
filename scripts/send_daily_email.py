@@ -85,14 +85,43 @@ def create_email_html(question: dict) -> str:
       border: 1px solid #e1e8ed;
       border-radius: 10px;
       padding: 24px 22px;
-      margin-bottom: 60px;
+      margin-bottom: 80px;
     }}
     .explanation-section {{
       background: #f0f7ff;
       border: 1px solid #d1e8ff;
       border-radius: 10px;
       padding: 24px 22px;
-      margin-bottom: 60px;
+      margin-top: 40px;
+    }}
+    .explanation-wrapper {{
+      margin-bottom: 80px;
+    }}
+    .explanation-details {{
+      width: 100%;
+    }}
+    .explanation-summary {{
+      background: #e3f2fd;
+      border: 2px dashed #2196f3;
+      border-radius: 8px;
+      padding: 18px 20px;
+      font-size: 16px;
+      font-weight: 600;
+      color: #1976d2;
+      cursor: pointer;
+      list-style: none;
+      transition: all 0.3s ease;
+    }}
+    .explanation-summary:hover {{
+      background: #bbdefb;
+      border-color: #1976d2;
+    }}
+    .explanation-summary::before {{
+      content: '⬇️ ';
+      margin-right: 8px;
+    }}
+    .explanation-details[open] .explanation-summary::before {{
+      content: '⬆️ ';
     }}
     .purpose-section {{
       background: #f9fbf5;
