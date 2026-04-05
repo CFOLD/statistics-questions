@@ -14,7 +14,7 @@ Set GitHub Actions secrets so this repository can send daily emails.
 | Secret name | Description | Example |
 |-------------|-------------|---------|
 | `SMTP_HOST` | SMTP server address | `smtp.gmail.com` |
-| `SMTP_PORT` | SMTP port | `587` |
+| `SMTP_PORT` | SMTP port | `465` or `587` |
 | `SMTP_USERNAME` | SMTP username / sender email | `your-email@gmail.com` |
 | `SMTP_PASSWORD` | SMTP password / app password | `xxxx xxxx xxxx xxxx` |
 | `EMAIL_RECIPIENTS` | Recipient email(s), comma-separated | `you@example.com, friend@example.com` |
@@ -29,8 +29,8 @@ Set GitHub Actions secrets so this repository can send daily emails.
 
 After setting secrets:
 
-1. Open the Actions tab
-2. Select `Daily Statistics Question Email`
+1. Open the **Actions** tab
+2. Select `Daily Email`
 3. Click `Run workflow`
 4. Confirm email delivery manually
 
