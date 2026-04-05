@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Daily Statistics Email Sender (official)
+"""Daily email sender.
 
-Loads templates/daily_email.html, renders today's question file to HTML,
-and sends via SMTP. Uses markdown-it-py and beautifulsoup4 when available,
-with safe fallbacks.
+Loads `templates/daily_email.html`, renders question markdown to HTML,
+and sends via SMTP. Uses `markdown-it-py` and `beautifulsoup4` when
+available, with safe fallbacks.
 
 Usage: python scripts/send_daily_email.py [--file PATH] [--dry-run]
 """

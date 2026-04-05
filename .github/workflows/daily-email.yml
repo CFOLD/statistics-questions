@@ -1,21 +1,26 @@
-name: Daily Statistics Question Email
+name: Daily Email
 
 on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  send-email:
+  send-daily-email:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ${{ github.workspace }}
+    env:
+      TZ: Asia/Seoul
     steps:
-      - name: Checkout
+      - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -23,7 +28,7 @@ jobs:
       - name: Install dependencies
         run: pip install markdown-it-py beautifulsoup4
 
-      - name: Send email (official)
+      - name: Send daily email
         env:
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT }}
