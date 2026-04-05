@@ -48,15 +48,10 @@ DEFAULTS = {
 }
 
 
-def find_question() -> Path:
+def find_question() -> Path | None:
     today = datetime.now().strftime("%Y%m%d")
     today_matches = sorted(QUESTIONS_DIR.glob(f"*{today}*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if today_matches:
-        return today_matches[0]
-    md = sorted(QUESTIONS_DIR.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not md:
-        raise FileNotFoundError("No question files found")
-    return md[0]
+    return today_matches[0] if today_matches else None
 
 
 SECTION_RE = re.compile(r"^(#{2,6})\s+(.+?)\s*$", re.I | re.M)
@@ -182,6 +177,9 @@ def main(argv: list[str]):
 
     tpl = load_template()
     qfile = Path(args.file) if args.file else find_question()
+    if qfile is None:
+        print("No question file found for today; skipping send.")
+        return
     content = qfile.read_text(encoding="utf-8")
     secs = parse_sections(content)
     q_html = md_to_html(secs["question"])
