@@ -26,6 +26,11 @@ except Exception:
     MarkdownIt = None
 
 try:
+    from mdit_py_plugins.table import table_plugin
+except Exception:
+    table_plugin = None
+
+try:
     from bs4 import BeautifulSoup
 except Exception:
     BeautifulSoup = None
@@ -91,20 +96,114 @@ def parse_sections(content: str) -> dict:
     return sections
 
 
+def extract_md_tables(md: str) -> tuple[str, dict[str, str]]:
+    lines = md.splitlines()
+    out: list[str] = []
+    tables: dict[str, str] = {}
+    i = 0
+    table_idx = 0
+
+    def is_table_row(line: str) -> bool:
+        s = line.strip()
+        return s.startswith("|") and s.endswith("|") and s.count("|") >= 2
+
+    def is_delim_row(line: str) -> bool:
+        s = line.strip().strip("|")
+        parts = [p.strip() for p in s.split("|")]
+        return bool(parts) and all(re.fullmatch(r":?-{3,}:?", p or "") for p in parts)
+
+    def split_row(line: str) -> list[str]:
+        s = line.strip().strip("|")
+        return [c.strip() for c in s.split("|")]
+
+    while i < len(lines):
+        if i + 1 < len(lines) and is_table_row(lines[i]) and is_delim_row(lines[i + 1]):
+            header = split_row(lines[i])
+            align_parts = split_row(lines[i + 1])
+            aligns = []
+            for part in align_parts:
+                left = part.startswith(":")
+                right = part.endswith(":")
+                if left and right:
+                    aligns.append("center")
+                elif right:
+                    aligns.append("right")
+                else:
+                    aligns.append("left")
+            rows = []
+            i += 2
+            while i < len(lines) and is_table_row(lines[i]):
+                rows.append(split_row(lines[i]))
+                i += 1
+            thead = "<thead><tr>" + "".join(
+                f'<th style="text-align:{aligns[idx] if idx < len(aligns) else "left"};">{cell}</th>'
+                for idx, cell in enumerate(header)
+            ) + "</tr></thead>"
+            body_rows = []
+            for row in rows:
+                body_rows.append("<tr>" + "".join(
+                    f'<td style="text-align:{aligns[idx] if idx < len(aligns) else "left"};">{cell}</td>'
+                    for idx, cell in enumerate(row)
+                ) + "</tr>")
+            tbody = "<tbody>" + "".join(body_rows) + "</tbody>"
+            key = f"TABLE_PLACEHOLDER_{table_idx}"
+            tables[key] = f"<table>{thead}{tbody}</table>"
+            out.append(key)
+            table_idx += 1
+            continue
+        out.append(lines[i])
+        i += 1
+    return "\n".join(out), tables
+
+
 def md_to_html(md: str) -> str:
     if not md:
         return ""
+    md, table_map = extract_md_tables(md)
     if MarkdownIt:
-        md_renderer = MarkdownIt("commonmark", {"html": False})
+        md_renderer = MarkdownIt("commonmark", {"html": False, "breaks": True, "linkify": True})
+        if table_plugin:
+            md_renderer.use(table_plugin)
         html = md_renderer.render(md)
     else:
         parts = [p.strip() for p in md.split('\n\n') if p.strip()]
         html = ''.join("<p>" + p.replace("\n", "<br/>") + "</p>" for p in parts)
+    for key, table_html in table_map.items():
+        html = html.replace(f"<p>{key}</p>", table_html).replace(key, table_html)
     if BeautifulSoup:
         soup = BeautifulSoup(f"<div>{html}</div>", "html.parser")
         for p in soup.find_all():
             if not p.get_text(strip=True) and not p.find(True):
                 p.decompose()
+        for table in soup.find_all("table"):
+            table["role"] = "presentation"
+            table["style"] = (
+                "width:100%; border-collapse:collapse; margin:16px 0; "
+                "font-size:14px; line-height:1.6; border:1px solid #d9e2ec;"
+            )
+            for th in table.find_all("th"):
+                base = th.get("style", "")
+                th["style"] = (
+                    base + ("; " if base else "") +
+                    "border:1px solid #d9e2ec; padding:10px 12px; background:#f8fafc; font-weight:700;"
+                )
+            for td in table.find_all("td"):
+                base = td.get("style", "")
+                td["style"] = base + ("; " if base else "") + "border:1px solid #d9e2ec; padding:10px 12px; vertical-align:top;"
+            for thead in table.find_all("thead"):
+                thead["style"] = "display:table-header-group;"
+            for tbody in table.find_all("tbody"):
+                tbody["style"] = "display:table-row-group;"
+        for code in soup.find_all("code"):
+            code["style"] = "background:#f3f4f6; padding:2px 5px; border-radius:4px; font-family:Consolas, Monaco, monospace;"
+        for pre in soup.find_all("pre"):
+            pre["style"] = "background:#0f172a; color:#e5e7eb; padding:14px; border-radius:8px; overflow:auto;"
+        for ul in soup.find_all("ul"):
+            ul["style"] = "margin:12px 0; padding-left:22px;"
+        for ol in soup.find_all("ol"):
+            ol["style"] = "margin:12px 0; padding-left:22px;"
+        for blockquote in soup.find_all("blockquote"):
+            blockquote["style"] = "margin:16px 0; padding:8px 16px; border-left:4px solid #cbd5e1; color:#475569;"
         return ''.join(str(c) for c in soup.div.contents)
     return html
 
