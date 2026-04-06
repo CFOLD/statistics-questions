@@ -19,16 +19,7 @@ from pathlib import Path
 from string import Template
 import smtplib
 
-# Optional dependencies
-try:
-    from markdown_it import MarkdownIt
-except Exception:
-    MarkdownIt = None
-
-try:
-    from bs4 import BeautifulSoup
-except Exception:
-    BeautifulSoup = None
+from email_render import md_to_html
 
 BASE = Path(__file__).resolve().parents[1]
 TEMPLATE_PATH = BASE / "templates" / "daily_email.html"
@@ -89,53 +80,6 @@ def parse_sections(content: str) -> dict:
     for k in ("question", "explanation"):
         sections[k] = sections[k].strip()
     return sections
-
-
-def md_to_html(md: str) -> str:
-    if not md:
-        return ""
-    if MarkdownIt:
-        md_renderer = MarkdownIt("commonmark", {"html": False, "breaks": True}).enable("table")
-        html = md_renderer.render(md)
-    else:
-        parts = [p.strip() for p in md.split('\n\n') if p.strip()]
-        html = ''.join("<p>" + p.replace("\n", "<br/>") + "</p>" for p in parts)
-    if BeautifulSoup:
-        soup = BeautifulSoup(f"<div>{html}</div>", "html.parser")
-        for p in soup.find_all():
-            if not p.get_text(strip=True) and not p.find(True):
-                p.decompose()
-        for table in soup.find_all("table"):
-            table["role"] = "presentation"
-            table["style"] = (
-                "width:100%; border-collapse:collapse; margin:16px 0; "
-                "font-size:14px; line-height:1.6; border:1px solid #d9e2ec;"
-            )
-            for th in table.find_all("th"):
-                base = th.get("style", "")
-                th["style"] = (
-                    base + ("; " if base else "") +
-                    "border:1px solid #d9e2ec; padding:10px 12px; background:#f8fafc; font-weight:700;"
-                )
-            for td in table.find_all("td"):
-                base = td.get("style", "")
-                td["style"] = base + ("; " if base else "") + "border:1px solid #d9e2ec; padding:10px 12px; vertical-align:top;"
-            for thead in table.find_all("thead"):
-                thead["style"] = "display:table-header-group;"
-            for tbody in table.find_all("tbody"):
-                tbody["style"] = "display:table-row-group;"
-        for code in soup.find_all("code"):
-            code["style"] = "background:#f3f4f6; padding:2px 5px; border-radius:4px; font-family:Consolas, Monaco, monospace;"
-        for pre in soup.find_all("pre"):
-            pre["style"] = "background:#0f172a; color:#e5e7eb; padding:14px; border-radius:8px; overflow:auto;"
-        for ul in soup.find_all("ul"):
-            ul["style"] = "margin:12px 0; padding-left:22px;"
-        for ol in soup.find_all("ol"):
-            ol["style"] = "margin:12px 0; padding-left:22px;"
-        for blockquote in soup.find_all("blockquote"):
-            blockquote["style"] = "margin:16px 0; padding:8px 16px; border-left:4px solid #cbd5e1; color:#475569;"
-        return ''.join(str(c) for c in soup.div.contents)
-    return html
 
 
 def load_template() -> Template:
