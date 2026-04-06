@@ -26,11 +26,6 @@ except Exception:
     MarkdownIt = None
 
 try:
-    from mdit_py_plugins.table import table_plugin
-except Exception:
-    table_plugin = None
-
-try:
     from bs4 import BeautifulSoup
 except Exception:
     BeautifulSoup = None
@@ -96,80 +91,15 @@ def parse_sections(content: str) -> dict:
     return sections
 
 
-def extract_md_tables(md: str) -> tuple[str, dict[str, str]]:
-    lines = md.splitlines()
-    out: list[str] = []
-    tables: dict[str, str] = {}
-    i = 0
-    table_idx = 0
-
-    def is_table_row(line: str) -> bool:
-        s = line.strip()
-        return s.startswith("|") and s.endswith("|") and s.count("|") >= 2
-
-    def is_delim_row(line: str) -> bool:
-        s = line.strip().strip("|")
-        parts = [p.strip() for p in s.split("|")]
-        return bool(parts) and all(re.fullmatch(r":?-{3,}:?", p or "") for p in parts)
-
-    def split_row(line: str) -> list[str]:
-        s = line.strip().strip("|")
-        return [c.strip() for c in s.split("|")]
-
-    while i < len(lines):
-        if i + 1 < len(lines) and is_table_row(lines[i]) and is_delim_row(lines[i + 1]):
-            header = split_row(lines[i])
-            align_parts = split_row(lines[i + 1])
-            aligns = []
-            for part in align_parts:
-                left = part.startswith(":")
-                right = part.endswith(":")
-                if left and right:
-                    aligns.append("center")
-                elif right:
-                    aligns.append("right")
-                else:
-                    aligns.append("left")
-            rows = []
-            i += 2
-            while i < len(lines) and is_table_row(lines[i]):
-                rows.append(split_row(lines[i]))
-                i += 1
-            thead = "<thead><tr>" + "".join(
-                f'<th style="text-align:{aligns[idx] if idx < len(aligns) else "left"};">{cell}</th>'
-                for idx, cell in enumerate(header)
-            ) + "</tr></thead>"
-            body_rows = []
-            for row in rows:
-                body_rows.append("<tr>" + "".join(
-                    f'<td style="text-align:{aligns[idx] if idx < len(aligns) else "left"};">{cell}</td>'
-                    for idx, cell in enumerate(row)
-                ) + "</tr>")
-            tbody = "<tbody>" + "".join(body_rows) + "</tbody>"
-            key = f"TABLE_PLACEHOLDER_{table_idx}"
-            tables[key] = f"<table>{thead}{tbody}</table>"
-            out.append(key)
-            table_idx += 1
-            continue
-        out.append(lines[i])
-        i += 1
-    return "\n".join(out), tables
-
-
 def md_to_html(md: str) -> str:
     if not md:
         return ""
-    md, table_map = extract_md_tables(md)
     if MarkdownIt:
-        md_renderer = MarkdownIt("commonmark", {"html": False, "breaks": True, "linkify": True})
-        if table_plugin:
-            md_renderer.use(table_plugin)
+        md_renderer = MarkdownIt("commonmark", {"html": False, "breaks": True}).enable("table")
         html = md_renderer.render(md)
     else:
         parts = [p.strip() for p in md.split('\n\n') if p.strip()]
         html = ''.join("<p>" + p.replace("\n", "<br/>") + "</p>" for p in parts)
-    for key, table_html in table_map.items():
-        html = html.replace(f"<p>{key}</p>", table_html).replace(key, table_html)
     if BeautifulSoup:
         soup = BeautifulSoup(f"<div>{html}</div>", "html.parser")
         for p in soup.find_all():
